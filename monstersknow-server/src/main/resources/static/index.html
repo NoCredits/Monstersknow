@@ -264,6 +264,11 @@
                             <option value="bugbear">Bugbear</option>
                         </select>
                     </div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                        <select id="entityAi" style="flex: 1; padding: 6px; border-radius: 3px; border: 1px solid #ff6b6b; background: rgba(255,255,255,0.1); color: #fff;">
+                            <option value="">Default AI</option>
+                        </select>
+                    </div>
                     <button onclick="spawnEntity()" style="width: 100%;">Spawn Entity</button>
                 </div>
 
@@ -498,17 +503,37 @@
             }
         }
 
+        async function loadAiList() {
+            try {
+                const response = await fetch('/api/ai/list');
+                const aiNames = await response.json();
+                const select = document.getElementById('entityAi');
+                const selected = select.value;
+                select.innerHTML = '<option value="">Default AI</option>';
+                aiNames.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    select.appendChild(option);
+                });
+                select.value = selected;
+            } catch (error) {
+                console.error('Error loading AI list:', error);
+            }
+        }
+
         async function spawnEntity() {
             try {
                 const x = parseInt(document.getElementById('spawnX').value);
                 const y = parseInt(document.getElementById('spawnY').value);
                 const type = document.getElementById('entityType').value;
-                
+                const aiName = document.getElementById('entityAi').value;
+
                 if (isNaN(x) || isNaN(y)) {
                     alert('Please enter valid coordinates');
                     return;
                 }
-                
+
                 // Make request to spawn entity
                 const response = await fetch('/api/combat/spawn', {
                     method: 'POST',
@@ -518,7 +543,8 @@
                     body: JSON.stringify({
                         type: type,
                         posX: x,
-                        posY: y
+                        posY: y,
+                        aiName: aiName
                     })
                 });
                 
@@ -886,6 +912,7 @@
 
         // Initial draw
         updateUI();
+        loadAiList();
 
         // Speed slider handler
         document.getElementById('speedSlider').addEventListener('input', function() {

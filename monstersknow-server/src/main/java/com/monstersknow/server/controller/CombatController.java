@@ -75,7 +75,7 @@ public class CombatController {
      */
     @PostMapping("/spawn")
     public CombatService.CombatData spawnEntity(@RequestBody SpawnRequest request) {
-        combatService.spawnEntity(request.type, request.posX, request.posY);
+        combatService.spawnEntity(request.type, request.posX, request.posY, request.aiName);
         return combatService.getCombatData();
     }
 
@@ -86,5 +86,6 @@ public class CombatController {
         public String type;
         public double posX;
         public double posY;
+        public String aiName; // optional; null/blank => default built-in AI
     }
 }

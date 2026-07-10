@@ -1,11 +1,15 @@
 package com.monstersknow.server.service;
 
+import com.monstersknow.core.ai.GoblinAi;
 import com.monstersknow.core.combat.CombatEngine;
+import com.monstersknow.core.entity.CustomAiGoblin;
 import com.monstersknow.core.entity.Entity;
 import com.monstersknow.core.entity.Goblin;
+import com.monstersknow.server.ai.AiPluginLoader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -15,6 +19,9 @@ import org.springframework.stereotype.Service;
 public class CombatService {
     private CombatEngine currentCombat;
     private List<Entity> activeCombatants;
+
+    @Autowired
+    private AiPluginLoader aiPluginLoader;
 
     public CombatService() {
         this.activeCombatants = new ArrayList<>();
@@ -93,9 +100,18 @@ public class CombatService {
     }
 
     /**
-     * Spawn a new entity in the current combat.
+     * Spawn a new entity in the current combat, using the default built-in AI.
      */
     public void spawnEntity(String type, double posX, double posY) {
+        spawnEntity(type, posX, posY, null);
+    }
+
+    /**
+     * Spawn a new entity in the current combat. If {@code aiName} names a
+     * loaded AI plugin, the spawned goblin delegates its decisions to that
+     * plugin instead of the default built-in ambush tactics.
+     */
+    public void spawnEntity(String type, double posX, double posY, String aiName) {
         if (currentCombat == null) {
             startNewCombat();
         }
@@ -106,18 +122,18 @@ public class CombatService {
 
         switch (type.toLowerCase()) {
             case "goblin":
-                newEntity = new Goblin(entityId, entityName);
+                newEntity = createGoblin(entityId, entityName, aiName);
                 break;
             case "hobgoblin":
                 // Use Goblin for now as placeholder (same stats)
-                newEntity = new Goblin(entityId, entityName);
+                newEntity = createGoblin(entityId, entityName, aiName);
                 break;
             case "bugbear":
                 // Use Goblin for now as placeholder (same stats)
-                newEntity = new Goblin(entityId, entityName);
+                newEntity = createGoblin(entityId, entityName, aiName);
                 break;
             default:
-                newEntity = new Goblin(entityId, entityName);
+                newEntity = createGoblin(entityId, entityName, aiName);
         }
 
         newEntity.setPosition(new Entity.Position(posX, posY));
@@ -125,6 +141,15 @@ public class CombatService {
 
         // Reinitialize combat engine with updated combatants
         currentCombat = new CombatEngine(activeCombatants);
+    }
+
+    private Goblin createGoblin(String entityId, String entityName, String aiName) {
+        if (aiName == null || aiName.isBlank()) {
+            return new Goblin(entityId, entityName);
+        }
+        GoblinAi ai = aiPluginLoader.get(aiName)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown AI: " + aiName));
+        return new CustomAiGoblin(entityId, entityName, ai, aiName);
     }
 
     /**
@@ -154,6 +179,7 @@ public class CombatService {
         public double posY;
         public boolean hidden;
         public boolean alive;
+        public String aiName;
 
         public EntityData() {}
 
@@ -168,6 +194,9 @@ public class CombatService {
             data.posY = entity.getPosition().y;
             data.hidden = entity.isHidden();
             data.alive = entity.isAlive();
+            if (entity instanceof CustomAiGoblin customAiGoblin) {
+                data.aiName = customAiGoblin.getAiName();
+            }
             return data;
         }
     }
