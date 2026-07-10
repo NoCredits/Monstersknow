@@ -71,9 +71,12 @@ public class Goblin extends Entity {
                 if (isHidden()) {
                     // Hidden and ready to shoot - FIRE!
                     return Action.attackRanged(nearestEnemy.getId());
-                } else {
-                    // Not hidden, try to hide first
+                } else if (combatState.isNearCover(this)) {
+                    // Not hidden, but there's cover nearby - hide first for advantage
                     return Action.hide();
+                } else {
+                    // No cover nearby - take the shot anyway rather than standing around
+                    return Action.attackRanged(nearestEnemy.getId());
                 }
             } else {
                 // Out of arrows - still fight, try to reposition or move closer for melee

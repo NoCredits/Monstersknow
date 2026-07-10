@@ -2,10 +2,11 @@ com\monstersknow\core\combat\CombatLog.class
 com\monstersknow\core\entity\Goblin.class
 com\monstersknow\core\entity\Action.class
 com\monstersknow\core\entity\Action$ActionType.class
+com\monstersknow\core\entity\TerrainFeature.class
 com\monstersknow\core\entity\Entity.class
 com\monstersknow\core\combat\CombatEngine$1.class
 com\monstersknow\core\entity\Stats.class
 com\monstersknow\core\entity\CombatState.class
+com\monstersknow\core\entity\Weapon.class
 com\monstersknow\core\entity\Entity$Position.class
 com\monstersknow\core\combat\CombatEngine.class
-com\monstersknow\core\combat\CombatEngine$TerrainFeature.class

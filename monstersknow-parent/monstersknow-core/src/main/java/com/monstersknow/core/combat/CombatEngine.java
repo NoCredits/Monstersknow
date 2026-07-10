@@ -3,6 +3,7 @@ package com.monstersknow.core.combat;
 import com.monstersknow.core.entity.Action;
 import com.monstersknow.core.entity.Entity;
 import com.monstersknow.core.entity.CombatState;
+import com.monstersknow.core.entity.TerrainFeature;
 import com.monstersknow.core.entity.Weapon;
 import java.util.*;
 
@@ -16,24 +17,6 @@ public class CombatEngine {
     private static final double BOUNDARY_MARGIN = 20; // Distance from edge before hitting wall
 
     // Terrain feature positions and sizes for hiding
-    private static class TerrainFeature {
-        double x, y, radius;
-        String type;
-        TerrainFeature(double x, double y, double radius, String type) {
-            this.x = x;
-            this.y = y;
-            this.radius = radius;
-            this.type = type;
-        }
-        
-        boolean isNear(double posX, double posY) {
-            double dx = posX - x;
-            double dy = posY - y;
-            double dist = Math.sqrt(dx * dx + dy * dy);
-            return dist <= radius * 1.5; // Can hide if within 1.5x radius
-        }
-    }
-
     private static final List<TerrainFeature> TERRAIN_FEATURES = Arrays.asList(
             new TerrainFeature(100, 150, 40, "rock"),
             new TerrainFeature(300, 250, 50, "rock"),
@@ -85,9 +68,9 @@ public class CombatEngine {
 
         turnNumber++;
         currentActor = actor;
-        CombatState state = new CombatState(combatants, actor, turnNumber);
+        CombatState state = new CombatState(combatants, actor, turnNumber, TERRAIN_FEATURES);
         Action action = actor.decideAction(state);
-        resolveAction(actor, action);
+        resolveAction(actor, action, state);
         
         // Move to next entity for next turn
         actorIndex++;
@@ -118,7 +101,7 @@ public class CombatEngine {
     /**
      * Resolve an action taken by an entity.
      */
-    private void resolveAction(Entity actor, Action action) {
+    private void resolveAction(Entity actor, Action action, CombatState state) {
         if (action == null) return;
 
         switch (action.getType()) {
@@ -128,7 +111,7 @@ public class CombatEngine {
             case MOVE_AWAY -> resolveMoveAway(actor, action);
             case HIDE -> {
                 // Check if near terrain before allowing hide
-                if (isNearTerrain(actor)) {
+                if (state.isNearCover(actor)) {
                     actor.setHidden(true);
                     log.add("  " + actor.getName() + " hides in the shadows!");
                 } else {
@@ -229,7 +212,7 @@ public class CombatEngine {
         // Only move if we actually moved (didn't hit wall)
         double actualDistance = current.distanceTo(newPos);
         actor.setPosition(newPos);
-        log.add("  " + actor.getName() + " moves toward enemy (" + 
+        log.add("  " + actor.getName() + " moves toward enemy [HOTRELOAD-TEST] (" +
                 String.format("%.0f", actualDistance / 8.0) + " ft).");
     }
 
@@ -317,18 +300,6 @@ public class CombatEngine {
         return new Entity.Position(x, y);
     }
 
-    /**
-     * Check if entity is near a terrain feature that provides cover.
-     */
-    private boolean isNearTerrain(Entity actor) {
-        Entity.Position pos = actor.getPosition();
-        for (TerrainFeature feature : TERRAIN_FEATURES) {
-            if (feature.isNear(pos.x, pos.y)) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     // Getters
     public int getTurnNumber() { return turnNumber; }

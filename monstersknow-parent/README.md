@@ -65,15 +65,23 @@ cd monstersknow-parent
 # alone leaves that dependency unresolved)
 mvn clean install -DskipTests
 
-# Run server
-cd monstersknow-server
-mvn spring-boot:run
+# Run server with hot reload (from the parent, in reactor mode)
+mvn -pl monstersknow-server -am spring-boot:run
 ```
 
-Note: run `mvn spring-boot:run` from inside `monstersknow-server`, not from
-the parent directory — running it from the parent with `-pl` fails with
-`No plugin found for prefix 'spring-boot'`, since the parent POM (packaging
-`pom`) doesn't declare the plugin.
+Note: `-pl monstersknow-server -am` runs the server as part of a multi-module
+reactor build together with `monstersknow-core`, so the server picks up
+`monstersknow-core/target/classes` directly instead of the jar installed in
+`.m2`. That, combined with `spring-boot-devtools` (already on the classpath)
+and `spring.devtools.restart.additional-paths` in `application.properties`,
+means edits to core classes (e.g. `Goblin.java`) trigger an automatic restart
+once recompiled — no need to manually stop the server, `mvn clean install`,
+and restart every time.
+
+If you only run `mvn spring-boot:run` from inside `monstersknow-server`
+directly (not as part of the reactor), it resolves `monstersknow-core` from
+`.m2` as a normal dependency and won't see local changes until you rerun
+`mvn clean install`.
 
 Server will start at `http://localhost:8080`
 
