@@ -1,5 +1,7 @@
 package com.monstersknow.core.entity;
 
+import java.util.Random;
+
 /**
  * Goblin entity - implements ambush tactics from the Monster Manual.
  * Key tactics:
@@ -17,6 +19,11 @@ public class Goblin extends Entity {
     private static final double DASH_SPEED = 60.0; // 60 feet when dashing (action + bonus action)
     private static final int STARTING_ARROWS = 20;
     private static final double SEARCH_SCAN_STEP_DEGREES = 60.0; // sweep per turn while no enemy is in view
+    private static final double FULL_SCAN_DEGREES = 360.0;
+    private static final double WANDER_DISTANCE = 20.0; // feet moved once a full scan finds nobody
+
+    private final Random random = new Random();
+    private double scanProgressDegrees = 0.0; // accumulated sweep since the last time an enemy was in view
 
     // 1d4 + DEX(+2), attack +4 (DEX +2, proficiency +2), 5 ft reach
     private static final Weapon SCIMITAR = new Weapon("Scimitar", 1, 4, 2, 4, 5, 5, false);
@@ -43,12 +50,23 @@ public class Goblin extends Entity {
         // looking the wrong way simply doesn't know they're there.
         Entity nearestEnemy = combatState.getNearestEnemy(this);
         if (nearestEnemy == null) {
-            // Nobody in view - sweep the field of view around, searching.
+            scanProgressDegrees += SEARCH_SCAN_STEP_DEGREES;
+            if (scanProgressDegrees >= FULL_SCAN_DEGREES) {
+                // Swept all the way around and still saw nobody - this spot is a bust,
+                // so wander off in a new direction rather than spinning in place forever.
+                scanProgressDegrees = 0.0;
+                double wanderAngle = random.nextDouble() * 2 * Math.PI;
+                Entity.Position wanderTarget = getPosition().move(WANDER_DISTANCE * 3, wanderAngle);
+                return Action.moveTowards(wanderTarget, WANDER_DISTANCE).withFacing(wanderAngle);
+            }
+            // Nobody in view yet - sweep the field of view around, searching.
             double newFacing = getFacingAngle() + Math.toRadians(SEARCH_SCAN_STEP_DEGREES);
             return Action.search().withFacing(newFacing);
         }
 
-        // Enemy spotted - keep looking at it for the rest of this turn's decision.
+        // Enemy spotted - reset the scan tally and keep looking at it for the rest of
+        // this turn's decision.
+        scanProgressDegrees = 0.0;
         double angleToEnemy = getPosition().angleTo(nearestEnemy.getPosition());
         Action action = decideCombatAction(combatState, nearestEnemy);
         return action.withFacing(angleToEnemy);
