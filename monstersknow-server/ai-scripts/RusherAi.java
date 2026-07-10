@@ -10,17 +10,27 @@ import com.monstersknow.core.entity.Action;
  * ignoring the default bow/hide ambush tactics.
  */
 public class RusherAi implements GoblinAi {
+    private static final double SCAN_STEP_DEGREES = 60.0;
+
     @Override
     public Action decideAction(AiContext ctx) {
         AiEntityView enemy = ctx.getNearestEnemy();
         if (enemy == null) {
-            return Action.idle();
+            if (!ctx.hasAnyLivingEnemy()) {
+                return Action.idle();
+            }
+            // Nobody in view right now - sweep the field of view around, searching.
+            double newFacing = ctx.getFacingAngle() + Math.toRadians(SCAN_STEP_DEGREES);
+            return Action.idle().withFacing(newFacing);
         }
 
+        double angleToEnemy = ctx.getSelfPosition().angleTo(enemy.getPosition());
         double distance = ctx.getSelfPosition().distanceTo(enemy.getPosition());
-        if (distance <= ctx.getMeleeWeaponRange()) {
-            return Action.attackMelee(enemy.getId());
-        }
-        return Action.moveTowards(enemy.getPosition(), 30.0);
+
+        Action action = distance <= ctx.getMeleeWeaponRange()
+                ? Action.attackMelee(enemy.getId())
+                : Action.moveTowards(enemy.getPosition(), 30.0);
+
+        return action.withFacing(angleToEnemy);
     }
 }

@@ -54,10 +54,16 @@ final class AiContextImpl implements AiContext {
     }
 
     @Override
+    public double getFacingAngle() { return self.getFacingAngle(); }
+
+    @Override
     public AiEntityView getNearestEnemy() {
         Entity nearest = state.getNearestEnemy(self);
         return nearest != null ? new AiEntityViewImpl(nearest) : null;
     }
+
+    @Override
+    public boolean hasAnyLivingEnemy() { return state.hasAnyLivingEnemy(self); }
 
     @Override
     public List<AiEntityView> getEnemiesWithinDistance(double distance) {

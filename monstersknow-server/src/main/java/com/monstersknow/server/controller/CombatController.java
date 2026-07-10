@@ -80,12 +80,28 @@ public class CombatController {
     }
 
     /**
+     * Change the AI controlling an already-spawned entity.
+     */
+    @PutMapping("/entity/{id}/ai")
+    public CombatService.CombatData changeEntityAi(@PathVariable("id") String id, @RequestBody ChangeAiRequest request) {
+        combatService.changeEntityAi(id, request.aiName);
+        return combatService.getCombatData();
+    }
+
+    /**
      * DTO for spawn requests.
      */
     public static class SpawnRequest {
         public String type;
         public double posX;
         public double posY;
+        public String aiName; // optional; null/blank => default built-in AI
+    }
+
+    /**
+     * DTO for change-AI requests.
+     */
+    public static class ChangeAiRequest {
         public String aiName; // optional; null/blank => default built-in AI
     }
 }

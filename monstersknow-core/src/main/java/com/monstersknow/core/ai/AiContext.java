@@ -27,8 +27,14 @@ public interface AiContext {
     double getRangedWeaponRange();
     double getMeleeWeaponRange();
 
+    // Vision - facing is free to read/change each turn; it doesn't cost the
+    // turn's action, and only affects which enemies getNearestEnemy()/
+    // getEnemiesWithinDistance() consider visible.
+    double getFacingAngle();
+
     // World query
     AiEntityView getNearestEnemy();
+    boolean hasAnyLivingEnemy();
     List<AiEntityView> getEnemiesWithinDistance(double distance);
     boolean isNearCover();
     boolean hasLineOfSightTo(String entityId);

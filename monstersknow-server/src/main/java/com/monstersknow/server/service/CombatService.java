@@ -143,6 +143,46 @@ public class CombatService {
         currentCombat = new CombatEngine(activeCombatants);
     }
 
+    /**
+     * Change the AI controlling an already-spawned goblin, preserving its
+     * position, health, hidden status and arrow count. Turn order, round/turn
+     * counters and the combat log are unaffected.
+     */
+    public void changeEntityAi(String entityId, String aiName) {
+        int index = -1;
+        Entity existing = null;
+        for (int i = 0; i < activeCombatants.size(); i++) {
+            if (activeCombatants.get(i).getId().equals(entityId)) {
+                index = i;
+                existing = activeCombatants.get(i);
+                break;
+            }
+        }
+        if (existing == null) {
+            throw new IllegalArgumentException("Unknown entity: " + entityId);
+        }
+        if (!(existing instanceof Goblin)) {
+            throw new IllegalArgumentException("Entity does not support AI selection: " + entityId);
+        }
+
+        Goblin replacement = createGoblin(existing.getId(), existing.getName(), aiName);
+        replacement.setPosition(existing.getPosition());
+        replacement.setHidden(existing.isHidden());
+
+        int damageTaken = replacement.getStats().getMaxHealth() - existing.getCurrentHealth();
+        if (damageTaken > 0) {
+            replacement.takeDamage(damageTaken);
+        }
+        while (replacement.getArrowsRemaining() > existing.getArrowsRemaining()) {
+            replacement.useArrow();
+        }
+
+        activeCombatants.set(index, replacement);
+        if (currentCombat != null) {
+            currentCombat.replaceEntity(replacement);
+        }
+    }
+
     private Goblin createGoblin(String entityId, String entityName, String aiName) {
         if (aiName == null || aiName.isBlank()) {
             return new Goblin(entityId, entityName);
@@ -180,6 +220,9 @@ public class CombatService {
         public boolean hidden;
         public boolean alive;
         public String aiName;
+        public double facingDegrees;
+        public double fieldOfViewDegrees;
+        public double viewDistanceFeet;
 
         public EntityData() {}
 
@@ -194,6 +237,9 @@ public class CombatService {
             data.posY = entity.getPosition().y;
             data.hidden = entity.isHidden();
             data.alive = entity.isAlive();
+            data.facingDegrees = Math.toDegrees(entity.getFacingAngle());
+            data.fieldOfViewDegrees = entity.getFieldOfViewDegrees();
+            data.viewDistanceFeet = entity.getViewDistance() / Entity.Position.PIXELS_PER_FOOT;
             if (entity instanceof CustomAiGoblin customAiGoblin) {
                 data.aiName = customAiGoblin.getAiName();
             }

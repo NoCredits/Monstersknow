@@ -33,15 +33,16 @@ public class CombatState {
         return false;
     }
 
-    /** 
-     * Find the nearest enemy to the given entity.
+    /**
+     * Find the nearest enemy to the given entity that is currently visible
+     * to it (within view distance and facing towards it).
      */
     public Entity getNearestEnemy(Entity entity) {
         Entity nearest = null;
         double nearestDistance = Double.MAX_VALUE;
 
         for (Entity other : allEntities) {
-            if (!other.getId().equals(entity.getId()) && other.isAlive()) {
+            if (!other.getId().equals(entity.getId()) && other.isAlive() && entity.canSee(other)) {
                 double distance = entity.getPosition().distanceTo(other.getPosition());
                 if (distance < nearestDistance) {
                     nearest = other;
@@ -53,22 +54,31 @@ public class CombatState {
     }
 
     /**
-     * Find all enemies within a certain distance.
+     * Whether any living enemy exists anywhere on the battlefield, regardless
+     * of whether {@code entity} can currently see them. Used to distinguish
+     * "combat is effectively over" from "nobody is in view right now".
+     */
+    public boolean hasAnyLivingEnemy(Entity entity) {
+        return allEntities.stream().anyMatch(e -> !e.getId().equals(entity.getId()) && e.isAlive());
+    }
+
+    /**
+     * Find all visible enemies within a certain distance.
      */
     public List<Entity> getEnemiesWithinDistance(Entity entity, double distance) {
         return allEntities.stream()
                 .filter(e -> !e.getId().equals(entity.getId()) && e.isAlive())
                 .filter(e -> entity.getPosition().distanceTo(e.getPosition()) <= distance)
+                .filter(entity::canSee)
                 .toList();
     }
 
     /**
-     * Check if line of sight exists between two entities.
+     * Check if {@code from} can see {@code to}: within view distance and
+     * inside its facing-centered field of view.
      */
     public boolean hasLineOfSight(Entity from, Entity to) {
-        // Simple implementation: always true for now
-        // Can be enhanced with actual obstacle checking
-        return true;
+        return from.canSee(to);
     }
 
     public List<Entity> getAllEntities() { return allEntities; }

@@ -14,6 +14,7 @@ public class Action {
         DISENGAGE,
         DASH,
         FLEE,
+        SEARCH,
         IDLE
     }
 
@@ -21,10 +22,36 @@ public class Action {
     private String targetId;
     private Entity.Position targetPosition;
     private double distance;
+    private Action bonusAction;
+    private Double desiredFacingAngle;
 
     private Action(ActionType type) {
         this.type = type;
     }
+
+    /**
+     * Attach a bonus action to be resolved right after this action, for
+     * creatures with a feature like Nimble Escape (Hide/Disengage as a
+     * bonus action). Only HIDE and DISENGAGE are meaningful as bonus actions.
+     */
+    public Action withBonusAction(Action bonusAction) {
+        this.bonusAction = bonusAction;
+        return this;
+    }
+
+    public Action getBonusAction() { return bonusAction; }
+
+    /**
+     * Attach a facing update (radians, atan2 convention) to apply this turn,
+     * independent of the action itself - e.g. keeping eyes on a target while
+     * moving/attacking, or sweeping a field of view while searching.
+     */
+    public Action withFacing(double radians) {
+        this.desiredFacingAngle = radians;
+        return this;
+    }
+
+    public Double getDesiredFacingAngle() { return desiredFacingAngle; }
 
     // Factory methods
     public static Action attackRanged(String targetId) {
@@ -82,6 +109,10 @@ public class Action {
 
     public static Action idle() {
         return new Action(ActionType.IDLE);
+    }
+
+    public static Action search() {
+        return new Action(ActionType.SEARCH);
     }
 
     // Getters

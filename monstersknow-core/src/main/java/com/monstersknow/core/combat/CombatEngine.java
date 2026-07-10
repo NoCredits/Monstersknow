@@ -121,7 +121,37 @@ public class CombatEngine {
             case DISENGAGE -> handleDisengage(actor);
             case DASH -> handleDash(actor, action);
             case FLEE -> resolveFlee(actor, action);
+            case SEARCH -> log.add("  " + actor.getName() + " scans the surroundings, searching for a target.");
             case IDLE -> log.add("  " + actor.getName() + " does nothing.");
+            default -> {}
+        }
+
+        // Facing is free - it doesn't cost the turn's action, so it applies
+        // regardless of which action/bonus action was taken.
+        if (action.getDesiredFacingAngle() != null) {
+            actor.setFacingAngle(action.getDesiredFacingAngle());
+        }
+
+        if (action.getBonusAction() != null) {
+            resolveBonusAction(actor, action.getBonusAction(), state);
+        }
+    }
+
+    /**
+     * Resolve a bonus action attached to the turn's main action (e.g. a
+     * goblin's Nimble Escape: Hide or Disengage as a bonus action).
+     */
+    private void resolveBonusAction(Entity actor, Action bonusAction, CombatState state) {
+        switch (bonusAction.getType()) {
+            case HIDE -> {
+                if (state.isNearCover(actor)) {
+                    actor.setHidden(true);
+                    log.add("  " + actor.getName() + " vanishes back into hiding (bonus action - Nimble Escape)!");
+                } else {
+                    log.add("  " + actor.getName() + " tries to hide as a bonus action but finds no cover!");
+                }
+            }
+            case DISENGAGE -> log.add("  " + actor.getName() + " disengages as a bonus action (Nimble Escape)!");
             default -> {}
         }
     }
@@ -212,7 +242,7 @@ public class CombatEngine {
         // Only move if we actually moved (didn't hit wall)
         double actualDistance = current.distanceTo(newPos);
         actor.setPosition(newPos);
-        log.add("  " + actor.getName() + " moves toward enemy [HOTRELOAD-TEST] (" +
+        log.add("  " + actor.getName() + " moves toward enemy  (" +
                 String.format("%.0f", actualDistance / 8.0) + " ft).");
     }
 
@@ -306,4 +336,21 @@ public class CombatEngine {
     public Entity getCurrentActor() { return currentActor; }
     public List<Entity> getCombatants() { return new ArrayList<>(combatants); }
     public CombatLog getLog() { return log; }
+
+    /**
+     * Swap out a combatant for a replacement with the same id (e.g. to change
+     * its AI mid-combat), preserving turn order, round/turn counters and the log.
+     */
+    public boolean replaceEntity(Entity replacement) {
+        for (int i = 0; i < combatants.size(); i++) {
+            if (combatants.get(i).getId().equals(replacement.getId())) {
+                combatants.set(i, replacement);
+                if (currentActor != null && currentActor.getId().equals(replacement.getId())) {
+                    currentActor = replacement;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
 }
