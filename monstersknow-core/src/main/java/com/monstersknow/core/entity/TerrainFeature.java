@@ -24,4 +24,7 @@ public class TerrainFeature {
     }
 
     public String getType() { return type; }
+    public double getX() { return x; }
+    public double getY() { return y; }
+    public double getRadius() { return radius; }
 }

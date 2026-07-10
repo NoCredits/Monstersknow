@@ -11,21 +11,28 @@ import java.util.*;
  * Core combat engine that orchestrates turns and resolves actions.
  */
 public class CombatEngine {
-    // Screen boundaries (matching canvas dimensions)
-    private static final double SCREEN_WIDTH = 800;
-    private static final double SCREEN_HEIGHT = 600;
-    private static final double BOUNDARY_MARGIN = 20; // Distance from edge before hitting wall
+    // Battlefield boundaries, in pixels (8 px = 1 foot -> 300ft x 200ft battlefield)
+    private static final double SCREEN_WIDTH = 2400;
+    private static final double SCREEN_HEIGHT = 1600;
+    private static final double BOUNDARY_MARGIN = 30; // Distance from edge before hitting wall
 
-    // Terrain feature positions and sizes for hiding
+    // Terrain feature positions and sizes for hiding, spread across the larger battlefield
     private static final List<TerrainFeature> TERRAIN_FEATURES = Arrays.asList(
-            new TerrainFeature(100, 150, 40, "rock"),
-            new TerrainFeature(300, 250, 50, "rock"),
-            new TerrainFeature(400, 100, 35, "tree"),
-            new TerrainFeature(500, 350, 35, "tree"),
-            new TerrainFeature(150, 400, 80, "shadow"),
-            new TerrainFeature(450, 200, 100, "shadow"),
-            new TerrainFeature(200, 300, 25, "bush"),
-            new TerrainFeature(550, 150, 25, "bush")
+            new TerrainFeature(250, 350, 55, "rock"),
+            new TerrainFeature(900, 700, 70, "rock"),
+            new TerrainFeature(1850, 300, 60, "rock"),
+            new TerrainFeature(1150, 1300, 50, "rock"),
+            new TerrainFeature(1150, 250, 50, "tree"),
+            new TerrainFeature(1500, 950, 50, "tree"),
+            new TerrainFeature(300, 1200, 45, "tree"),
+            new TerrainFeature(2050, 1200, 55, "tree"),
+            new TerrainFeature(450, 1050, 130, "shadow"),
+            new TerrainFeature(1350, 550, 150, "shadow"),
+            new TerrainFeature(2000, 750, 120, "shadow"),
+            new TerrainFeature(650, 250, 40, "bush"),
+            new TerrainFeature(1650, 1350, 40, "bush"),
+            new TerrainFeature(750, 900, 35, "bush"),
+            new TerrainFeature(1950, 450, 35, "bush")
     );
 
     private List<Entity> combatants;
@@ -35,6 +42,7 @@ public class CombatEngine {
     private Entity currentActor;
     private Random random;
     private CombatLog log;
+    private AttackEvent lastAttackEvent;
 
     public CombatEngine(List<Entity> combatants) {
         this.combatants = new ArrayList<>(combatants);
@@ -68,6 +76,7 @@ public class CombatEngine {
 
         turnNumber++;
         currentActor = actor;
+        lastAttackEvent = null;
         CombatState state = new CombatState(combatants, actor, turnNumber, TERRAIN_FEATURES);
         Action action = actor.decideAction(state);
         resolveAction(actor, action, state);
@@ -184,9 +193,13 @@ public class CombatEngine {
             actor.useArrow();
         }
 
-        if (totalAttack >= target.getStats().getArmorClass()) {
-            // Hit!
-            int damage = weapon.rollDamage(random);
+        boolean isHit = totalAttack >= target.getStats().getArmorClass();
+        int damage = 0;
+        Entity.Position attackerPos = actor.getPosition();
+        Entity.Position targetPos = target.getPosition();
+
+        if (isHit) {
+            damage = weapon.rollDamage(random);
             target.takeDamage(damage);
             log.add("  " + actor.getName() + (wasHidden ? " (hidden)" : "") + " shoots " + target.getName() +
                     " with " + weapon.getName() + " for " + damage + " damage! (roll: " + roll + " + " + attackBonus + " = " + totalAttack +
@@ -196,6 +209,9 @@ public class CombatEngine {
                     " with " + weapon.getName() + " but misses! (roll: " + roll + " + " + attackBonus + " = " + totalAttack +
                     " vs AC " + target.getStats().getArmorClass() + ")");
         }
+
+        lastAttackEvent = new AttackEvent(AttackEvent.Kind.RANGED, actor.getId(), target.getId(),
+                attackerPos.x, attackerPos.y, targetPos.x, targetPos.y, isHit, damage, weapon.getName());
 
         // Attacking reveals position
         actor.setHidden(false);
@@ -211,9 +227,13 @@ public class CombatEngine {
         int attackBonus = calculateAttackBonus(actor, weapon, false);
         int roll = random.nextInt(20) + 1;
         int totalAttack = roll + attackBonus;
+        boolean isHit = totalAttack >= target.getStats().getArmorClass();
+        int damage = 0;
+        Entity.Position attackerPos = actor.getPosition();
+        Entity.Position targetPos = target.getPosition();
 
-        if (totalAttack >= target.getStats().getArmorClass()) {
-            int damage = weapon.rollDamage(random);
+        if (isHit) {
+            damage = weapon.rollDamage(random);
             target.takeDamage(damage);
             log.add("  " + actor.getName() + " slashes " + target.getName() +
                     " with " + weapon.getName() + " for " + damage + " damage! (roll: " + roll + " + " + attackBonus + " = " + totalAttack +
@@ -223,6 +243,9 @@ public class CombatEngine {
                     " but misses! (roll: " + roll + " + " + attackBonus + " = " + totalAttack +
                     " vs AC " + target.getStats().getArmorClass() + ")");
         }
+
+        lastAttackEvent = new AttackEvent(AttackEvent.Kind.MELEE, actor.getId(), target.getId(),
+                attackerPos.x, attackerPos.y, targetPos.x, targetPos.y, isHit, damage, weapon.getName());
 
         actor.setHidden(false);
     }
@@ -336,6 +359,10 @@ public class CombatEngine {
     public Entity getCurrentActor() { return currentActor; }
     public List<Entity> getCombatants() { return new ArrayList<>(combatants); }
     public CombatLog getLog() { return log; }
+    public AttackEvent getLastAttackEvent() { return lastAttackEvent; }
+    public static double getWorldWidth() { return SCREEN_WIDTH; }
+    public static double getWorldHeight() { return SCREEN_HEIGHT; }
+    public static List<TerrainFeature> getTerrainFeatures() { return TERRAIN_FEATURES; }
 
     /**
      * Swap out a combatant for a replacement with the same id (e.g. to change

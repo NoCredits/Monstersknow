@@ -1,10 +1,13 @@
 package com.monstersknow.server.service;
 
 import com.monstersknow.core.ai.GoblinAi;
+import com.monstersknow.core.combat.AttackEvent;
 import com.monstersknow.core.combat.CombatEngine;
 import com.monstersknow.core.entity.CustomAiGoblin;
 import com.monstersknow.core.entity.Entity;
 import com.monstersknow.core.entity.Goblin;
+import com.monstersknow.core.entity.TerrainFeature;
+import com.monstersknow.core.entity.Weapon;
 import com.monstersknow.server.ai.AiPluginLoader;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,11 +41,13 @@ public class CombatService {
         Goblin goblin2 = new Goblin("goblin-2", "Snagg");
         Goblin goblin3 = new Goblin("goblin-3", "Zargh");
 
-        // Place them on grid squares (multiples of 40 pixels = 5-foot squares)
-        // Grid positions are at 5-foot intervals across the battlefield
-        goblin1.setPosition(new Entity.Position(100, 150));  // ~25 feet, 37 feet
-        goblin2.setPosition(new Entity.Position(480, 80));   // ~120 feet, 20 feet
-        goblin3.setPosition(new Entity.Position(240, 400));  // ~60 feet, 100 feet
+        // Place them on grid squares (multiples of 40 pixels = 5-foot squares). Kept within
+        // each other's 60ft view distance (480px) so they spot each other immediately, same
+        // relative spacing as before - just relocated onto the larger battlefield (2400x1600px,
+        // see CombatEngine) so there's terrain and room to kite/flee/chase around them.
+        goblin1.setPosition(new Entity.Position(600, 700));
+        goblin2.setPosition(new Entity.Position(980, 630));
+        goblin3.setPosition(new Entity.Position(740, 950));
 
         activeCombatants.add(goblin1);
         activeCombatants.add(goblin2);
@@ -87,7 +92,8 @@ public class CombatService {
         return new CombatData(
                 currentCombat.getTurnNumber(),
                 currentCombat.getCombatants(),
-                currentCombat.getLog().getEntries()
+                currentCombat.getLog().getEntries(),
+                currentCombat.getLastAttackEvent()
         );
     }
 
@@ -199,13 +205,23 @@ public class CombatService {
         public int turnNumber;
         public List<EntityData> entities;
         public List<String> log;
+        public double worldWidth;
+        public double worldHeight;
+        public List<TerrainFeatureData> terrain;
+        public AttackEventData lastAttack;
 
-        public CombatData(int turnNumber, List<Entity> entities, List<String> log) {
+        public CombatData(int turnNumber, List<Entity> entities, List<String> log, AttackEvent lastAttackEvent) {
             this.turnNumber = turnNumber;
             this.entities = entities.stream()
                     .map(EntityData::fromEntity)
                     .toList();
             this.log = log;
+            this.worldWidth = CombatEngine.getWorldWidth();
+            this.worldHeight = CombatEngine.getWorldHeight();
+            this.terrain = CombatEngine.getTerrainFeatures().stream()
+                    .map(TerrainFeatureData::fromFeature)
+                    .toList();
+            this.lastAttack = AttackEventData.fromEvent(lastAttackEvent);
         }
     }
 
@@ -223,6 +239,10 @@ public class CombatService {
         public double facingDegrees;
         public double fieldOfViewDegrees;
         public double viewDistanceFeet;
+        public String meleeWeaponName;
+        public String rangedWeaponName;
+        public boolean rangedWeaponUsesAmmo;
+        public int arrowsRemaining;
 
         public EntityData() {}
 
@@ -240,9 +260,73 @@ public class CombatService {
             data.facingDegrees = Math.toDegrees(entity.getFacingAngle());
             data.fieldOfViewDegrees = entity.getFieldOfViewDegrees();
             data.viewDistanceFeet = entity.getViewDistance() / Entity.Position.PIXELS_PER_FOOT;
+            Weapon meleeWeapon = entity.getMeleeWeapon();
+            Weapon rangedWeapon = entity.getRangedWeapon();
+            if (meleeWeapon != null) {
+                data.meleeWeaponName = meleeWeapon.getName();
+            }
+            if (rangedWeapon != null) {
+                data.rangedWeaponName = rangedWeapon.getName();
+                data.rangedWeaponUsesAmmo = rangedWeapon.usesAmmo();
+            }
+            data.arrowsRemaining = entity.getArrowsRemaining();
             if (entity instanceof CustomAiGoblin customAiGoblin) {
                 data.aiName = customAiGoblin.getAiName();
             }
+            return data;
+        }
+    }
+
+    /**
+     * DTO for a battlefield terrain feature (rock, tree, shadow, bush, ...).
+     */
+    public static class TerrainFeatureData {
+        public String type;
+        public double x;
+        public double y;
+        public double radius;
+
+        public static TerrainFeatureData fromFeature(TerrainFeature feature) {
+            TerrainFeatureData data = new TerrainFeatureData();
+            data.type = feature.getType();
+            data.x = feature.getX();
+            data.y = feature.getY();
+            data.radius = feature.getRadius();
+            return data;
+        }
+    }
+
+    /**
+     * DTO for the attack (if any) resolved on the most recent turn, letting
+     * the client animate a projectile/swing along its real trajectory.
+     */
+    public static class AttackEventData {
+        public String kind;
+        public String attackerId;
+        public String targetId;
+        public double attackerX;
+        public double attackerY;
+        public double targetX;
+        public double targetY;
+        public boolean hit;
+        public int damage;
+        public String weaponName;
+
+        public static AttackEventData fromEvent(AttackEvent event) {
+            if (event == null) {
+                return null;
+            }
+            AttackEventData data = new AttackEventData();
+            data.kind = event.getKind().name();
+            data.attackerId = event.getAttackerId();
+            data.targetId = event.getTargetId();
+            data.attackerX = event.getAttackerX();
+            data.attackerY = event.getAttackerY();
+            data.targetX = event.getTargetX();
+            data.targetY = event.getTargetY();
+            data.hit = event.isHit();
+            data.damage = event.getDamage();
+            data.weaponName = event.getWeaponName();
             return data;
         }
     }

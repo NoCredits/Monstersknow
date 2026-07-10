@@ -20,7 +20,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1700px;
             margin: 0 auto;
         }
 
@@ -48,7 +48,7 @@
             border: 2px solid #ff6b6b;
             border-radius: 8px;
             padding: 10px;
-            height: 600px;
+            height: 850px;
         }
 
         .sidebar-top {
@@ -184,7 +184,7 @@
             border: 1px solid #ff6b6b;
             border-radius: 8px;
             padding: 15px;
-            height: 600px;
+            height: 850px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
@@ -268,13 +268,13 @@
                     </div>
                     <div style="margin-top: 15px;">
                         <label for="stepSlider" style="font-size: 12px; color: #aaa;">Step Delay:</label>
-                        <input type="range" id="stepSlider" min="50" max="500" value="100" 
+                        <input type="range" id="stepSlider" min="50" max="500" value="100"
                                style="width: 100%; cursor: pointer;">
                         <div style="font-size: 10px; color: #888; text-align: center;" id="stepLabel">100ms</div>
                     </div>
                     <div style="margin-top: 10px;">
                         <label for="speedSlider" style="font-size: 12px; color: #aaa;">Turn Delay:</label>
-                        <input type="range" id="speedSlider" min="100" max="1500" value="600" 
+                        <input type="range" id="speedSlider" min="100" max="1500" value="600"
                                style="width: 100%; cursor: pointer;">
                         <div style="font-size: 10px; color: #888; text-align: center;" id="speedLabel">600ms</div>
                     </div>
@@ -283,9 +283,9 @@
                 <div class="panel">
                     <h3>Spawn Entity</h3>
                     <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                        <input type="number" id="spawnX" placeholder="X" min="0" max="800" value="100" 
+                        <input type="number" id="spawnX" placeholder="X" min="0" max="2400" value="100"
                                style="flex: 1; padding: 6px; border-radius: 3px; border: 1px solid #ff6b6b; background: rgba(255,255,255,0.1); color: #fff;">
-                        <input type="number" id="spawnY" placeholder="Y" min="0" max="600" value="100" 
+                        <input type="number" id="spawnY" placeholder="Y" min="0" max="1600" value="100"
                                style="flex: 1; padding: 6px; border-radius: 3px; border: 1px solid #ff6b6b; background: rgba(255,255,255,0.1); color: #fff;">
                     </div>
                     <div style="display: flex; gap: 8px; margin-bottom: 10px;">
@@ -320,35 +320,74 @@
         const canvas = document.getElementById('combatCanvas');
         const ctx = canvas.getContext('2d');
         let currentCombatData = null;
-        let terrain = []; // Store terrain features
         let isSimulating = false; // Track if simulation is running
         let turnDelay = 600; // Delay in milliseconds between turns
-        let stepDelay = 100; // Delay in milliseconds between steps (for animation)
-        let animatedEntity = null; // Currently animating entity data
-        let animationSteps = []; // Array of animation steps to perform
+        let stepDelay = 100; // Delay in milliseconds between movement animation steps
+        const PROJECTILE_STEP_MS = 16; // Frame pace for projectile/swing animation (independent of the sliders above)
 
         // Grid settings - 5 feet per square (D&D standard)
-        const GRID_SIZE = 40; // pixels per 5-foot square
+        const GRID_SIZE = 40; // pixels per 5-foot square, in WORLD space
         const FEET_PER_SQUARE = 5;
         const PIXELS_PER_FOOT = GRID_SIZE / FEET_PER_SQUARE;
+        const ENTITY_RADIUS = 42; // world-space radius of a creature's body (big enough that the facing/weapon detail reads clearly once scaled to screen)
 
-        // Terrain feature definitions
-        const TERRAIN_FEATURES = [
-            { type: 'rock', x: 100, y: 150, size: 40, hideBonus: 3 },
-            { type: 'rock', x: 300, y: 250, size: 50, hideBonus: 3 },
-            { type: 'tree', x: 400, y: 100, size: 35, hideBonus: 4 },
-            { type: 'tree', x: 500, y: 350, size: 35, hideBonus: 4 },
-            { type: 'shadow', x: 150, y: 400, size: 80, hideBonus: 5 },
-            { type: 'shadow', x: 450, y: 200, size: 100, hideBonus: 5 },
-            { type: 'bush', x: 200, y: 300, size: 25, hideBonus: 2 },
-            { type: 'bush', x: 550, y: 150, size: 25, hideBonus: 2 },
+        // Battlefield (world) size and terrain, in world-space pixels. These defaults mirror
+        // CombatEngine's constants so the map renders immediately on load; the server sends the
+        // authoritative values with every response and they're applied in updateWorldFromData().
+        let WORLD_WIDTH = 2400;
+        let WORLD_HEIGHT = 1600;
+        let terrain = [
+            { type: 'rock', x: 250, y: 350, radius: 55 },
+            { type: 'rock', x: 900, y: 700, radius: 70 },
+            { type: 'rock', x: 1850, y: 300, radius: 60 },
+            { type: 'rock', x: 1150, y: 1300, radius: 50 },
+            { type: 'tree', x: 1150, y: 250, radius: 50 },
+            { type: 'tree', x: 1500, y: 950, radius: 50 },
+            { type: 'tree', x: 300, y: 1200, radius: 45 },
+            { type: 'tree', x: 2050, y: 1200, radius: 55 },
+            { type: 'shadow', x: 450, y: 1050, radius: 130 },
+            { type: 'shadow', x: 1350, y: 550, radius: 150 },
+            { type: 'shadow', x: 2000, y: 750, radius: 120 },
+            { type: 'bush', x: 650, y: 250, radius: 40 },
+            { type: 'bush', x: 1650, y: 1350, radius: 40 },
+            { type: 'bush', x: 750, y: 900, radius: 35 },
+            { type: 'bush', x: 1950, y: 450, radius: 35 },
         ];
+
+        // Camera: maps the (possibly much larger) world onto whatever size the canvas element
+        // happens to be, preserving aspect ratio so circles stay circles instead of stretching.
+        let camera = { scale: 1, offsetX: 0, offsetY: 0 };
+        let uiScale = 1; // 1 / camera.scale - use to keep line widths/text a constant apparent size
+
+        function computeCamera() {
+            const scaleX = canvas.width / WORLD_WIDTH;
+            const scaleY = canvas.height / WORLD_HEIGHT;
+            camera.scale = Math.max(0.001, Math.min(scaleX, scaleY));
+            camera.offsetX = (canvas.width - WORLD_WIDTH * camera.scale) / 2;
+            camera.offsetY = (canvas.height - WORLD_HEIGHT * camera.scale) / 2;
+            uiScale = 1 / camera.scale;
+        }
+
+        function applyCameraTransform() {
+            ctx.setTransform(camera.scale, 0, 0, camera.scale, camera.offsetX, camera.offsetY);
+        }
+
+        function updateWorldFromData(data) {
+            if (!data) return;
+            let changed = false;
+            if (data.worldWidth && data.worldWidth !== WORLD_WIDTH) { WORLD_WIDTH = data.worldWidth; changed = true; }
+            if (data.worldHeight && data.worldHeight !== WORLD_HEIGHT) { WORLD_HEIGHT = data.worldHeight; changed = true; }
+            if (data.terrain) terrain = data.terrain;
+            if (changed) computeCamera();
+        }
 
         // Resize canvas
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
             canvas.width = rect.width - 20;
             canvas.height = rect.height - 20;
+            computeCamera();
+            drawCombatMap();
         }
 
         window.addEventListener('resize', resizeCanvas);
@@ -359,6 +398,7 @@
                 const response = await fetch('/api/combat/start', { method: 'POST' });
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 currentCombatData = await response.json();
+                updateWorldFromData(currentCombatData);
                 updateUI();
             } catch (error) {
                 console.error('Error starting combat:', error);
@@ -375,21 +415,24 @@
                 const response = await fetch('/api/combat/turn', { method: 'POST' });
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const newData = await response.json();
-                
-                // Animate movement for entities that moved
-                if (currentCombatData && currentCombatData.entities) {
+                updateWorldFromData(newData);
+
+                if (newData.lastAttack) {
+                    // Animate the attack (arrow flight / melee swing) while the old health/hidden
+                    // state is still showing, so the hit/miss lands visually before it's applied.
+                    await animateAttack(newData.lastAttack);
+                } else if (currentCombatData && currentCombatData.entities) {
                     for (let i = 0; i < currentCombatData.entities.length; i++) {
                         const oldEntity = currentCombatData.entities[i];
                         const newEntity = newData.entities[i];
-                        
-                        if (oldEntity && newEntity && 
+
+                        if (oldEntity && newEntity &&
                             (oldEntity.posX !== newEntity.posX || oldEntity.posY !== newEntity.posY)) {
-                            // Entity moved - animate the movement
                             await animateMovement(oldEntity, newEntity);
                         }
                     }
                 }
-                
+
                 currentCombatData = newData;
                 updateUI();
             } catch (error) {
@@ -403,53 +446,153 @@
             const startY = oldEntity.posY;
             const endX = newEntity.posX;
             const endY = newEntity.posY;
-            
+
             const dx = endX - startX;
             const dy = endY - startY;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            
+
             // Calculate number of steps (one per foot of movement)
-            // Each foot is PIXELS_PER_FOOT pixels
             const steps = Math.ceil(distance / PIXELS_PER_FOOT);
-            
+            const others = (currentCombatData && currentCombatData.entities) || [];
+
             for (let step = 1; step <= steps; step++) {
                 await sleep(stepDelay);
-                
+
                 // Linear interpolation for smooth movement
                 const progress = step / steps;
                 const currentX = startX + dx * progress;
                 const currentY = startY + dy * progress;
-                
-                // Temporarily update for drawing
                 const tempEntity = { ...oldEntity, posX: currentX, posY: currentY };
-                
-                // Redraw with updated position
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                // Draw background
-                const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-                gradient.addColorStop(0, '#1a4d6d');
-                gradient.addColorStop(1, '#0a2540');
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Draw terrain
-                drawTerrain();
-                
-                // Draw all entities with animated one
-                if (currentCombatData && currentCombatData.entities) {
-                    currentCombatData.entities.forEach(entity => {
-                        if (entity.id === oldEntity.id) {
-                            drawEntity(tempEntity);
-                        } else {
-                            drawEntity(entity);
-                        }
-                    });
-                }
-                
-                // Draw grid
-                drawGrid();
+
+                const frameEntities = others.map(e => e.id === oldEntity.id ? tempEntity : e);
+                renderFrame(frameEntities, null);
             }
+        }
+
+        /**
+         * Animate a resolved attack's real trajectory: an arrow arcing from shooter to target for
+         * ranged weapons (with ammo), or a quick swing flash for adjacent melee hits.
+         */
+        async function animateAttack(attack) {
+            if (attack.kind === 'RANGED') {
+                await animateProjectile(attack);
+            } else if (attack.kind === 'MELEE') {
+                await animateMeleeSwing(attack);
+            }
+        }
+
+        async function animateProjectile(attack) {
+            const fromX = attack.attackerX, fromY = attack.attackerY;
+            const toX = attack.targetX, toY = attack.targetY;
+            const dx = toX - fromX, dy = toY - fromY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < 1) return;
+
+            const steps = Math.max(10, Math.min(30, Math.round(distance / 50)));
+            const arcHeight = Math.min(90, distance * 0.18);
+            const nx = -dy / distance, ny = dx / distance; // perpendicular unit vector, for the arc bulge
+            const baseEntities = (currentCombatData && currentCombatData.entities) || [];
+
+            for (let step = 1; step <= steps; step++) {
+                await sleep(PROJECTILE_STEP_MS);
+                const t = step / steps;
+                const bulge = Math.sin(Math.PI * t) * arcHeight;
+                const curX = fromX + dx * t + nx * bulge;
+                const curY = fromY + dy * t + ny * bulge;
+
+                // Tangent of the arc at t, so the arrow points the way it's actually flying
+                const dBulge = Math.PI * Math.cos(Math.PI * t) * arcHeight;
+                const angle = Math.atan2(dy + ny * dBulge, dx + nx * dBulge);
+
+                renderFrame(baseEntities, () => drawArrow(curX, curY, angle));
+            }
+
+            for (let i = 0; i < 4; i++) {
+                await sleep(PROJECTILE_STEP_MS);
+                renderFrame(baseEntities, () => drawImpact(toX, toY, i / 3, attack.hit));
+            }
+        }
+
+        async function animateMeleeSwing(attack) {
+            const baseEntities = (currentCombatData && currentCombatData.entities) || [];
+            const midX = (attack.attackerX + attack.targetX) / 2;
+            const midY = (attack.attackerY + attack.targetY) / 2;
+            const angle = Math.atan2(attack.targetY - attack.attackerY, attack.targetX - attack.attackerX);
+
+            for (let i = 0; i < 5; i++) {
+                await sleep(PROJECTILE_STEP_MS);
+                renderFrame(baseEntities, () => drawSlash(midX, midY, angle, i / 4, attack.hit));
+            }
+        }
+
+        function drawArrow(x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            const len = ENTITY_RADIUS * 1.55;
+            ctx.strokeStyle = '#e8d9a0';
+            ctx.lineWidth = 3 * uiScale;
+            ctx.beginPath();
+            ctx.moveTo(-len / 2, 0);
+            ctx.lineTo(len / 2, 0);
+            ctx.stroke();
+
+            ctx.fillStyle = '#d4c07a';
+            ctx.beginPath();
+            ctx.moveTo(len / 2 + 9, 0);
+            ctx.lineTo(len / 2 - 13, -10);
+            ctx.lineTo(len / 2 - 13, 10);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = '#ff6b6b';
+            ctx.lineWidth = 2.4 * uiScale;
+            ctx.beginPath();
+            ctx.moveTo(-len / 2, 0);
+            ctx.lineTo(-len / 2 + 16, -11);
+            ctx.moveTo(-len / 2, 0);
+            ctx.lineTo(-len / 2 + 16, 11);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawImpact(x, y, progress, hit) {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, 1 - progress);
+            if (hit) {
+                ctx.strokeStyle = '#ffd93d';
+                ctx.lineWidth = 3.5 * uiScale;
+                const r = ENTITY_RADIUS * (0.33 + progress * 1.2);
+                for (let i = 0; i < 5; i++) {
+                    const ang = (Math.PI * 2 / 5) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(x + Math.cos(ang) * r * 0.4, y + Math.sin(ang) * r * 0.4);
+                    ctx.lineTo(x + Math.cos(ang) * r, y + Math.sin(ang) * r);
+                    ctx.stroke();
+                }
+            } else {
+                ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+                ctx.lineWidth = 2.4 * uiScale;
+                ctx.beginPath();
+                ctx.arc(x, y, ENTITY_RADIUS * (0.33 + progress * 0.65), 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawSlash(x, y, angle, progress, hit) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.globalAlpha = Math.max(0, 1 - progress * 0.85);
+            ctx.strokeStyle = hit ? '#ffd93d' : 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = (hit ? 4.5 : 2.5) * uiScale;
+            const sweep = Math.PI * 0.6;
+            const r = ENTITY_RADIUS * (1.1 + progress * 0.45);
+            ctx.beginPath();
+            ctx.arc(0, 0, r, -sweep / 2, sweep / 2);
+            ctx.stroke();
+            ctx.restore();
         }
 
         async function auto5Turns() {
@@ -460,13 +603,13 @@
                 }
                 isSimulating = true;
                 disableButtons(true);
-                
+
                 // Execute 5 turns with animation between each
                 for (let i = 0; i < 5 && currentCombatData; i++) {
                     await sleep(turnDelay);
                     await nextTurn();
                 }
-                
+
                 disableButtons(false);
                 isSimulating = false;
             } catch (error) {
@@ -485,13 +628,13 @@
                 }
                 isSimulating = true;
                 disableButtons(true);
-                
+
                 // Execute 10 turns with animation between each
                 for (let i = 0; i < 10 && currentCombatData; i++) {
                     await sleep(turnDelay);
                     await nextTurn();
                 }
-                
+
                 disableButtons(false);
                 isSimulating = false;
             } catch (error) {
@@ -510,19 +653,19 @@
                 }
                 isSimulating = true;
                 disableButtons(true);
-                
+
                 // Continue executing turns until combat is over
                 let isActive = true;
                 while (isActive && currentCombatData) {
                     const activeResponse = await fetch('/api/combat/active');
                     isActive = await activeResponse.json();
-                    
+
                     if (isActive) {
                         await sleep(turnDelay);
                         await nextTurn();
                     }
                 }
-                
+
                 disableButtons(false);
                 isSimulating = false;
                 alert('Combat has ended!');
@@ -567,6 +710,7 @@
                 });
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 currentCombatData = await response.json();
+                updateWorldFromData(currentCombatData);
                 updateUI();
             } catch (error) {
                 console.error('Error changing entity AI:', error);
@@ -600,12 +744,13 @@
                         aiName: aiName
                     })
                 });
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                
+
                 currentCombatData = await response.json();
+                updateWorldFromData(currentCombatData);
                 updateUI();
             } catch (error) {
                 console.error('Error spawning entity:', error);
@@ -675,6 +820,7 @@
                     <div class="health-bar">
                         <div class="health-fill" style="width: ${healthPercent}%"></div>
                     </div>
+                    ${entity.rangedWeaponName ? `<div class="entity-health">🏹 ${entity.rangedWeaponName}: ${entity.arrowsRemaining} left</div>` : ''}
                 `;
 
                 const aiSelect = document.createElement('select');
@@ -698,7 +844,7 @@
 
             // Show only the last 15 entries for clarity
             const recentEntries = currentCombatData.log.slice(-15);
-            
+
             recentEntries.forEach((entry, index) => {
                 const div = document.createElement('div');
                 div.className = 'log-entry';
@@ -710,124 +856,109 @@
                 div.textContent = entry;
                 logDiv.appendChild(div);
             });
-            
+
             // Auto-scroll to bottom
             logDiv.scrollTop = logDiv.scrollHeight;
         }
 
-        function drawCombatMap() {
+        /**
+         * Render one full frame: background, world boundary, terrain, the given entities and the
+         * grid, all inside the camera transform, then an optional overlay (projectile/impact/slash)
+         * drawn on top. Shared by the static map draw and every animation step so the whole scene
+         * always redraws consistently instead of layering partial frames.
+         */
+        function renderFrame(entities, overlayFn) {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw background
-            ctx.fillStyle = 'linear-gradient(to bottom, #0f3460, #1a5f7a)';
+
             const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
             gradient.addColorStop(0, '#1a4d6d');
             gradient.addColorStop(1, '#0a2540');
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw walls/borders at screen boundaries
+            applyCameraTransform();
+
             drawBoundaries();
-
-            // Draw terrain features
             drawTerrain();
-
-            // Draw entities
-            if (currentCombatData && currentCombatData.entities) {
-                currentCombatData.entities.forEach(entity => {
-                    drawEntity(entity);
-                });
-            }
-
-            // Draw grid (subtle)
+            entities.forEach(entity => drawEntity(entity));
             drawGrid();
+
+            if (overlayFn) overlayFn();
+
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }
+
+        function drawCombatMap() {
+            const entities = (currentCombatData && currentCombatData.entities) || [];
+            renderFrame(entities, null);
         }
 
         function drawBoundaries() {
-            // Draw thick border around the battlefield
-            const borderWidth = 3;
-            const borderColor = '#ff6b6b';
-            
-            ctx.strokeStyle = borderColor;
+            const borderWidth = 3 * uiScale;
+            ctx.strokeStyle = '#ff6b6b';
             ctx.lineWidth = borderWidth;
             ctx.globalAlpha = 0.6;
-            
-            // Draw rectangle border
-            ctx.strokeRect(borderWidth/2, borderWidth/2, 
-                          canvas.width - borderWidth, canvas.height - borderWidth);
-            
-            // Add corner decorations (stone blocks)
+            ctx.strokeRect(borderWidth / 2, borderWidth / 2,
+                          WORLD_WIDTH - borderWidth, WORLD_HEIGHT - borderWidth);
+
             ctx.globalAlpha = 0.8;
             ctx.fillStyle = '#4a4a4a';
-            const cornerSize = 15;
-            
-            // Top-left
+            const cornerSize = 15 * uiScale;
             ctx.fillRect(0, 0, cornerSize, cornerSize);
-            // Top-right
-            ctx.fillRect(canvas.width - cornerSize, 0, cornerSize, cornerSize);
-            // Bottom-left
-            ctx.fillRect(0, canvas.height - cornerSize, cornerSize, cornerSize);
-            // Bottom-right
-            ctx.fillRect(canvas.width - cornerSize, canvas.height - cornerSize, cornerSize, cornerSize);
-            
+            ctx.fillRect(WORLD_WIDTH - cornerSize, 0, cornerSize, cornerSize);
+            ctx.fillRect(0, WORLD_HEIGHT - cornerSize, cornerSize, cornerSize);
+            ctx.fillRect(WORLD_WIDTH - cornerSize, WORLD_HEIGHT - cornerSize, cornerSize, cornerSize);
+
             ctx.globalAlpha = 1;
         }
 
         function drawTerrain() {
-            TERRAIN_FEATURES.forEach(feature => {
-                const x = (feature.x % canvas.width + canvas.width) % canvas.width;
-                const y = (feature.y % canvas.height + canvas.height) % canvas.height;
-
-                switch(feature.type) {
+            terrain.forEach(feature => {
+                switch (feature.type) {
                     case 'rock':
-                        drawRock(x, y, feature.size);
+                        drawRock(feature.x, feature.y, feature.radius);
                         break;
                     case 'tree':
-                        drawTree(x, y, feature.size);
+                        drawTree(feature.x, feature.y, feature.radius);
                         break;
                     case 'shadow':
-                        drawShadow(x, y, feature.size);
+                        drawShadow(feature.x, feature.y, feature.radius);
                         break;
                     case 'bush':
-                        drawBush(x, y, feature.size);
+                        drawBush(feature.x, feature.y, feature.radius);
                         break;
                 }
             });
         }
 
         function drawRock(x, y, size) {
-            // Draw rock with shading
             ctx.fillStyle = '#5a5a5a';
             ctx.beginPath();
             ctx.ellipse(x, y, size * 0.7, size * 0.5, 0.2, 0, Math.PI * 2);
             ctx.fill();
 
-            // Highlight
             ctx.fillStyle = 'rgba(100, 100, 100, 0.4)';
             ctx.beginPath();
             ctx.ellipse(x - size * 0.2, y - size * 0.1, size * 0.3, size * 0.2, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Border
             ctx.strokeStyle = '#444';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2 * uiScale;
             ctx.beginPath();
             ctx.ellipse(x, y, size * 0.7, size * 0.5, 0.2, 0, Math.PI * 2);
             ctx.stroke();
         }
 
         function drawTree(x, y, size) {
-            // Trunk
             ctx.fillStyle = '#3d2817';
             ctx.fillRect(x - size * 0.15, y, size * 0.3, size * 0.8);
 
-            // Foliage
             ctx.fillStyle = '#2d5016';
             ctx.beginPath();
             ctx.arc(x, y - size * 0.3, size * 0.6, 0, Math.PI * 2);
             ctx.fill();
 
-            // Darker foliage for depth
             ctx.fillStyle = '#1d3d0f';
             ctx.beginPath();
             ctx.arc(x - size * 0.2, y - size * 0.1, size * 0.5, 0, Math.PI * 2);
@@ -835,28 +966,24 @@
         }
 
         function drawShadow(x, y, size) {
-            // Dark area representing shadow
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
             ctx.beginPath();
             ctx.ellipse(x, y, size * 0.8, size * 0.6, 0.1, 0, Math.PI * 2);
             ctx.fill();
 
-            // Edge gradient
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2 * uiScale;
             ctx.beginPath();
             ctx.ellipse(x, y, size * 0.8, size * 0.6, 0.1, 0, Math.PI * 2);
             ctx.stroke();
         }
 
         function drawBush(x, y, size) {
-            // Bush - spiky appearance
             ctx.fillStyle = '#4a6b2f';
             ctx.beginPath();
             ctx.arc(x, y, size * 0.8, 0, Math.PI * 2);
             ctx.fill();
 
-            // Lighter bush edges
             ctx.fillStyle = '#6d9f3f';
             for (let i = 0; i < 8; i++) {
                 const angle = (Math.PI * 2 / 8) * i;
@@ -870,108 +997,174 @@
 
         function drawGrid() {
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-            ctx.lineWidth = 1;
-
-            // Draw vertical lines
-            for (let x = 0; x < canvas.width; x += GRID_SIZE) {
-                ctx.beginPath();
+            ctx.lineWidth = 1 * uiScale;
+            ctx.beginPath();
+            for (let x = 0; x <= WORLD_WIDTH; x += GRID_SIZE) {
                 ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
+                ctx.lineTo(x, WORLD_HEIGHT);
             }
-
-            // Draw horizontal lines
-            for (let y = 0; y < canvas.height; y += GRID_SIZE) {
-                ctx.beginPath();
+            for (let y = 0; y <= WORLD_HEIGHT; y += GRID_SIZE) {
                 ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
+                ctx.lineTo(WORLD_WIDTH, y);
             }
+            ctx.stroke();
 
-            // Draw grid coordinates every 5 squares (25 feet)
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.font = '9px Arial';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.font = (9 * uiScale) + 'px Arial';
             ctx.textAlign = 'right';
             ctx.textBaseline = 'bottom';
-            
-            for (let x = 0; x < canvas.width; x += GRID_SIZE * 5) {
-                for (let y = 0; y < canvas.height; y += GRID_SIZE * 5) {
+
+            for (let x = 0; x < WORLD_WIDTH; x += GRID_SIZE * 5) {
+                for (let y = 0; y < WORLD_HEIGHT; y += GRID_SIZE * 5) {
                     const feet = Math.round((x / PIXELS_PER_FOOT) / 5) * 5;
-                    ctx.fillText(feet + "'", x - 2, y - 2);
+                    ctx.fillText(feet + "'", x - 2 * uiScale, y - 2 * uiScale);
                 }
             }
         }
 
-        function drawEntity(entity) {
-            const x = (entity.posX % canvas.width + canvas.width) % canvas.width;
-            const y = (entity.posY % canvas.height + canvas.height) % canvas.height;
-            const radius = 12;
+        /**
+         * Faint facing-centered vision cone, straight from the server's facing/FOV/view-distance
+         * model (Entity.canSee) - makes each creature's look direction and sight range legible at
+         * a glance, not just its forward-facing "nose".
+         */
+        function drawVisionCone(entity, x, y, facingRad) {
+            const distancePx = (entity.viewDistanceFeet || 0) * PIXELS_PER_FOOT;
+            if (distancePx <= 0) return;
+            const halfFov = ((entity.fieldOfViewDegrees || 90) * Math.PI / 180) / 2;
 
-            // Draw shadow beneath entity
+            ctx.save();
+            ctx.globalAlpha = 0.05;
+            ctx.fillStyle = entity.hidden ? '#88ccff' : '#ffd93d';
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.arc(x, y, distancePx, facingRad - halfFov, facingRad + halfFov);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawWeaponIcon(entity) {
+            const hasArrows = entity.rangedWeaponUsesAmmo ? entity.arrowsRemaining > 0 : !!entity.rangedWeaponName;
+            ctx.lineCap = 'round';
+
+            if (entity.rangedWeaponName && hasArrows) {
+                // Small bow: a curved stave plus a taut string, held to the side
+                const r = ENTITY_RADIUS * 0.55;
+                ctx.strokeStyle = entity.hidden ? '#cfe9ff' : '#3a2a1a';
+                ctx.lineWidth = 1.8 * uiScale;
+                ctx.beginPath();
+                ctx.arc(-ENTITY_RADIUS * 0.1, 0, r, -Math.PI * 0.6, Math.PI * 0.6);
+                ctx.stroke();
+                ctx.strokeStyle = entity.hidden ? '#cfe9ff' : '#ddd';
+                ctx.lineWidth = 1 * uiScale;
+                ctx.beginPath();
+                ctx.moveTo(-ENTITY_RADIUS * 0.1 + Math.cos(-Math.PI * 0.6) * r, Math.sin(-Math.PI * 0.6) * r);
+                ctx.lineTo(-ENTITY_RADIUS * 0.1 + Math.cos(Math.PI * 0.6) * r, Math.sin(Math.PI * 0.6) * r);
+                ctx.stroke();
+            } else if (entity.meleeWeaponName) {
+                // Small blade held forward-side
+                ctx.strokeStyle = entity.hidden ? '#cfe9ff' : '#ccc';
+                ctx.lineWidth = 2.2 * uiScale;
+                ctx.beginPath();
+                ctx.moveTo(-ENTITY_RADIUS * 0.15, ENTITY_RADIUS * 0.65);
+                ctx.lineTo(ENTITY_RADIUS * 0.95, ENTITY_RADIUS * 0.3);
+                ctx.stroke();
+            }
+            ctx.lineCap = 'butt';
+        }
+
+        function drawEntityHud(entity, x, y) {
+            const barWidth = ENTITY_RADIUS * 2.5;
+            const barHeight = 5;
+            const healthPercent = entity.maxHealth > 0 ? entity.currentHealth / entity.maxHealth : 0;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(x - barWidth / 2, y + ENTITY_RADIUS + 6, barWidth, barHeight);
+            ctx.fillStyle = healthPercent > 0.3 ? '#4caf50' : '#ff6b6b';
+            ctx.fillRect(x - barWidth / 2, y + ENTITY_RADIUS + 6, barWidth * healthPercent, barHeight);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1 * uiScale;
+            ctx.strokeRect(x - barWidth / 2, y + ENTITY_RADIUS + 6, barWidth, barHeight);
+
+            ctx.fillStyle = entity.hidden ? '#88ccff' : '#fff';
+            ctx.font = 'bold ' + (11 * uiScale) + 'px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(entity.name, x, y - ENTITY_RADIUS - 4);
+
+            let belowOffset = ENTITY_RADIUS + 14;
+            if (entity.hidden) {
+                ctx.fillStyle = '#88ccff';
+                ctx.font = 'bold ' + (9 * uiScale) + 'px Arial';
+                ctx.textBaseline = 'top';
+                ctx.fillText('⊙ hidden', x, y + belowOffset);
+                belowOffset += 12;
+            }
+            if (entity.rangedWeaponUsesAmmo) {
+                ctx.fillStyle = 'rgba(255,255,255,0.75)';
+                ctx.font = (9 * uiScale) + 'px Arial';
+                ctx.textBaseline = 'top';
+                ctx.fillText('🏹' + entity.arrowsRemaining, x, y + belowOffset);
+            }
+        }
+
+        function drawEntity(entity) {
+            const x = entity.posX;
+            const y = entity.posY;
+            const facingRad = (entity.facingDegrees || 0) * Math.PI / 180;
+
+            if (entity.alive) {
+                drawVisionCone(entity, x, y, facingRad);
+            }
+
+            // Ground shadow
             ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
             ctx.beginPath();
-            ctx.ellipse(x, y + radius + 2, radius * 1.2, radius * 0.4, 0, 0, Math.PI * 2);
+            ctx.ellipse(x, y + ENTITY_RADIUS + 3, ENTITY_RADIUS * 1.2, ENTITY_RADIUS * 0.4, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Draw entity circle with color based on type
-            if (entity.hidden) {
-                // Hidden - very transparent with outline only
-                ctx.globalAlpha = 0.3;
-                ctx.fillStyle = '#88ccff';
-            } else {
-                ctx.globalAlpha = 1;
-                ctx.fillStyle = '#ff6b6b';
-            }
+            let bodyColor = '#ff6b6b';
+            let bodyAlpha = 1;
+            if (entity.hidden) { bodyColor = '#88ccff'; bodyAlpha = 0.35; }
+            if (!entity.alive) { bodyColor = '#888'; bodyAlpha = 0.5; }
 
-            if (!entity.alive) {
-                ctx.globalAlpha = 0.5;
-                ctx.fillStyle = '#888';
-            }
-            
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(facingRad);
+            ctx.globalAlpha = bodyAlpha;
+
+            // Vector body: a circle plus a forward-pointing "nose" wedge and eyes, so the facing
+            // direction (entity.facingDegrees, driven by Entity.setFacingAngle server-side) reads
+            // clearly even without a sprite.
+            ctx.fillStyle = bodyColor;
             ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.arc(0, 0, ENTITY_RADIUS, 0, Math.PI * 2);
             ctx.fill();
-            
-            ctx.globalAlpha = 1;
-
-            // Draw border
             ctx.strokeStyle = entity.hidden ? '#88ccff' : '#fff';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.lineWidth = 2 * uiScale;
             ctx.stroke();
 
-            // Draw health indicator bar
-            const barWidth = radius * 2.5;
-            const barHeight = 4;
-            const healthPercent = entity.currentHealth / entity.maxHealth;
+            ctx.fillStyle = entity.hidden ? '#cfe9ff' : '#fff';
+            ctx.beginPath();
+            ctx.moveTo(ENTITY_RADIUS * 0.5, -ENTITY_RADIUS * 0.55);
+            ctx.lineTo(ENTITY_RADIUS * 1.35, 0);
+            ctx.lineTo(ENTITY_RADIUS * 0.5, ENTITY_RADIUS * 0.55);
+            ctx.closePath();
+            ctx.fill();
 
-            // Background bar
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.fillRect(x - barWidth / 2, y + radius + 6, barWidth, barHeight);
+            ctx.fillStyle = '#1a1a2e';
+            ctx.beginPath();
+            ctx.arc(ENTITY_RADIUS * 0.35, -ENTITY_RADIUS * 0.35, ENTITY_RADIUS * 0.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(ENTITY_RADIUS * 0.35, ENTITY_RADIUS * 0.35, ENTITY_RADIUS * 0.15, 0, Math.PI * 2);
+            ctx.fill();
 
-            // Health bar
-            ctx.fillStyle = healthPercent > 0.3 ? '#4caf50' : '#ff6b6b';
-            ctx.fillRect(x - barWidth / 2, y + radius + 6, barWidth * healthPercent, barHeight);
+            drawWeaponIcon(entity);
 
-            // Health border
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(x - barWidth / 2, y + radius + 6, barWidth, barHeight);
+            ctx.restore();
 
-            // Draw name
-            ctx.fillStyle = entity.hidden ? '#88ccff' : '#fff';
-            ctx.font = 'bold 10px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(entity.name.substring(0, 3), x, y);
-
-            // Draw hidden indicator
-            if (entity.hidden) {
-                ctx.fillStyle = '#88ccff';
-                ctx.font = 'bold 8px Arial';
-                ctx.fillText('⊙', x, y + radius + 16);
-            }
+            drawEntityHud(entity, x, y);
         }
 
         // Initial draw
