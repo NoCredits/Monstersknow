@@ -1,0 +1,106 @@
+GOBLINOIDS
+Here’s what we know about goblins from the Monster Manual: First, from the
+�avor text, they live in dark, dismal settings; congregate in large numbers; and
+employ alarms and traps. They’re low-Strength and high-Dexterity, with a very
+good Stealth modi�er. Their Intelligence and Wisdom are in the average range.
+They possess darkvision and the Nimble Escape feature, which allows them to
+Disengage or Hide as a bonus action—very important to their action economy.
+Because of their darkvision, goblins frequently attack under cover of
+darkness, when their targets may be e�ectively blinded (attack rolls against a
+blinded creature have advantage, while the blinded creature’s attack rolls have
+disadvantage). They’ll also attack from hiding as much as possible, making use
+of their high Stealth modi�er, and doing so in dim light decreases the likelihood
+that they’ll be discovered, since many player characters will have disadvantage on
+Perception checks that rely on sight.
+A picture of goblin combat is starting to coalesce, and at the center of it is a
+strategy of ambush.
+A typical goblin combat turn goes Shortbow (action), move, Hide (bonus
+action). Because they attack from hiding, they roll with advantage. Regardless of
+whether they hit or miss, the attack gives their position away, so they change it
+immediately, because they can. (The sequence is important. Whenever possible,
+a goblin must end its turn hidden; otherwise, it’s vulnerable.
+Move/Hide/Shortbow would achieve the same o�ensive result but leave the
+goblin exposed to retaliation between turns.)
+Being a Small creature, a goblin has a good chance of Hiding successfully
+behind the trunk of a mature tree; even if it fails, it will still enjoy three-quarters
+cover (+5 AC). But since you can’t hide while someone is looking directly at
+you, goblins have to use their movement to scramble out of the PCs’ �eld of
+view, meaning they have to be close enough for their own 30-foot movement
+speed to describe a signi�cant arc. At the same time, they don’t want to be so
+close that a PC could close the gap between them and attack. So the optimal
+distance from the targets of their ambush is about 40 feet, no closer—and they
+don’t want to move farther from the PCs than 80 feet, their bows’ maximum
+range for normal shooting.
+As long as they can stay out of the PCs’ reach, they’ll use this tactic over and
+over. Suppose, however, that a PC does manage to close with one of them. In
+that case, the goblin Disengages (bonus action) �rst. Then, depending on how
+great a threat the PC poses, it either Dashes (action) out of reach—forcing the
+PC to use a Dash action as well if they want to catch up—or, if it thinks it may
+be able to �nish the PC o�, moves its full distance to a place of cover, then Hides
+(action) again, preparing to attack with advantage on its next turn.
+Incidentally, the goblins aren’t trying to stay together as a group. They aren’t
+looking out for their buddies—goblins don’t do that sort of thing. They are,
+however, trying to goad the PCs into splitting up.
+Goblins are squishy: They have only 7 hp. One good hit will seriously wound
+them—and also mean that their genius sniping strategy has failed. Therefore, a
+goblin reduced to just 1 or 2 hp �ees the scene, end of story. But a moderately
+wounded goblin (3 or 4 hp) is thirsty and tries to regain the upper hand. It stalks
+the PC who wounded it, �rst retreating to a safe distance, then Hiding and
+moving with Stealth until it can get back to around 40 feet from its quarry, at
+which point it returns to its Shortbow/move/Hide sniping tactic. A captured
+goblin surrenders immediately and grovels for mercy, counting on its ability to
+escape as soon as its captor’s attention wanders.
+What if the PCs have the good sense to take cover themselves? Goblins aren’t
+brilliant, but they aren’t stupid either. They won’t waste arrows on a target
+that’s behind three-quarters cover, because that would completely negate the
+advantage they gain when shooting from hiding. Instead, a goblin stealthily
+repositions itself alongside or behind its target before shooting and giving its
+own position away.
+A goblin that �nishes o� its target doesn’t immediately go hunting after
+other targets. If another is already in view, it attacks that one. If not, the greedy
+goblin �rst ransacks the body of its victim for anything valuable. A clever and
+stealthy PC who’s counter-stalking the goblins can exploit this weakness.
+So far, the entire discussion has been about ranged attacks. Goblins carry
+scimitars as well, but they don’t use these out in the open, because there’s no
+advantage to it. The only time a goblin willingly engages in melee combat is
+when it has some other overwhelming advantage, such as a combination of
+numbers, darkness, and the ability to �ank, which in �fth edition D&D means
+attacking from two opposite sides of a target creature. (Front-and-side isn’t
+enough to gain advantage on attack rolls. See “Optional Rule: Flanking,”
+Dungeon Master’s Guide, chapter 8.)
+A goblin’s +4 attack modi�er isn’t quite good enough to give it two-to-one
+odds of hitting an armored enemy by itself, but when advantage is brought into
+play, a hit is almost guaranteed. If three goblins surround a PC in the dark, the
+chances are very good that they’ll land three hits and not have to worry about
+retaliation. That being said, if those three hits don’t �nish the PC o�, the
+goblins will realize that they’ve bitten o� more than they can chew, and on their
+next turn, they’ll Disengage (bonus action), go scampering o� into the darkness
+(movement), and Hide (action) someplace where they may later be able to land a
+surprise hit on a wounded foe.
+Also, goblins can tell the di�erence between a creature that’s lost in the dark
+and one that has darkvision. They won’t attack the latter close up if they can
+avoid it; instead, they’ll prefer to shoot with their shortbows. However, in the
+narrow passages of a cave, establishing a good line of sight may not always be
+possible, and melee may be the only way to attack. If this happens, they’ll use
+their knowledge of the terrain to tease the party into overextending itself: A lead
+goblin may use its Scimitar attack (action), Disengage (bonus action), then
+retreat down the passageway (movement) until it comes out into a more open
+cavern where it and several other goblins can all jump the �rst PC who emerges
+with Readied attack actions. Meanwhile, while the PCs are being drawn
+forward, other goblins may shoot or stab at them opportunistically from any
+side passages that exist along the way.
+There is one other circumstance when goblins may engage in melee �ghting:
+when commanded to do so by hobgoblins or bugbears, which goblins fear and
+defer to. They’ll do it, but they won’t like it. They know they’re not good at it;
+they’d rather be sniping. If pressed into an infantry unit, they’ll �ght without
+coordination and desert at the �rst opportunity. However, that doesn’t mean
+they won’t keep attacking if they think there’s something to be gained by doing
+it their way.
+Goblins recognize the value of stealth and surprise, and they’re not about to
+let anyone get the same advantage against them. They make extensive use of
+alarms and traps, but since they’re not great inventors, by and large, most of
+these are crude: metal junk that makes a racket when disturbed, falling rocks,
+pits (with or without punji sticks), simple snares. Every once in a while, though,
+a lucky goblin may get its hands on a hunter’s trap that both restrains its victim
+and does damage. These are prized possessions, and the goblins use them to
+protect their most important locations.
