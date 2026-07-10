@@ -1,71 +1,78 @@
 # Monstersknow - Combat Simulation Game
 
-A tactical combat simulator featuring D&D 5e-inspired monsters with AI-driven behavior. Watch creatures battle using realistic combat tactics and strategies.
+A tactical combat simulator featuring D&D 5e-inspired monsters with AI-driven behavior. Watch creatures battle using realistic combat tactics and strategies — and write your own goblin AI without touching the game's source code.
 
 ## Architecture
 
 ```
-monstersknow-parent/
-├── monstersknow-core/          # Core game logic (combat engine, entities, tactics)
-├── monstersknow-server/        # Spring Boot REST API server
-└── goblins.txt                 # Original goblin tactics document
+.
+├── monstersknow-core/           # Core game logic (combat engine, entities, AI contract)
+├── monstersknow-server/         # Spring Boot REST API + web UI
+│   └── ai-scripts/              # Drop-in custom AI .java files, loaded at startup
+├── goblins.txt                  # Original goblin tactics document (D&D Monster Manual)
+└── pom.xml                      # Maven multi-module parent
 ```
 
 ## Components
 
-### 1. **Core Module** (`monstersknow-core`)
+### 1. Core Module (`monstersknow-core`)
 Game logic that's completely independent of the web framework.
 
-**Key Classes:**
-- `Entity` - Base class for all creatures
-- `Goblin` - Goblin implementation with ambush tactics
-- `Stats` - Creature attributes (STR, DEX, CON, etc.)
-- `Action` - Action types (Attack, Move, Hide, etc.)
-- `CombatState` - Current state of the battle
-- `CombatEngine` - Turn-based combat orchestrator
+**Key classes:**
+- `Entity` — base class for all creatures
+- `Goblin` — default goblin implementation with built-in ambush tactics
+- `CustomAiGoblin` — a `Goblin` whose `decideAction` is delegated to a runtime-loaded [custom AI plugin](#writing-a-custom-goblin-ai)
+- `Stats` — creature attributes (STR, DEX, CON, etc.)
+- `Weapon` — damage dice, attack bonus, and range for a melee/ranged weapon
+- `Action` — action types (Attack, Move, Hide, Flee, etc.)
+- `CombatState` — current state of the battle
+- `CombatEngine` — turn-based combat orchestrator
+- `com.monstersknow.core.ai` — the plugin contract (`GoblinAi`, `AiContext`, `AiEntityView`) that custom AI code is written against
 
-**Tactics Implemented:**
+**Built-in goblin tactics:**
 - Ambush attacks from hiding (advantage)
-- Optimal distance maintenance (40-80 feet)
-- Flee when seriously wounded (1-2 HP)
-- Counter-attack when moderately wounded (3-4 HP)
+- Optimal distance maintenance (40-80 feet) with bow kiting
+- Flee when critically wounded (1 HP)
 - Hide/Move/Attack action sequences
 
-### 2. **Server Module** (`monstersknow-server`)
-Spring Boot REST API with web UI.
+### 2. Server Module (`monstersknow-server`)
+Spring Boot REST API with a canvas-based web UI.
 
-**REST Endpoints:**
-- `POST /api/combat/start` - Start new combat
-- `POST /api/combat/turn` - Execute single turn
-- `POST /api/combat/turns/{count}` - Execute multiple turns
-- `GET /api/combat/state` - Get current combat state
-- `GET /api/combat/active` - Check if combat is active
-- `POST /api/combat/reset` - Reset combat
+**Combat endpoints (`/api/combat`):**
+- `POST /start` — start a new combat (three default goblins)
+- `POST /turn` — execute a single turn
+- `POST /turns/{count}` — execute multiple turns
+- `GET /state` — get current combat state
+- `GET /active` — check if combat is still active
+- `POST /reset` — reset combat
+- `POST /spawn` — spawn a new entity; body `{ type, posX, posY, aiName? }`. Omit `aiName` (or leave it blank) for the default built-in AI.
+
+**AI plugin endpoints (`/api/ai`):**
+- `POST /compile` — body `{ aiName, sourceCode }`, compiles and (re)registers a custom AI. Returns `400` with compiler diagnostics on failure.
+- `GET /list` — names of currently loaded AI plugins, usable as `spawn`'s `aiName`.
 
 **Web UI:**
 - Real-time combat visualization (canvas)
-- Entity status display (health, position, hidden state)
+- Entity status display (health, position, hidden state, active AI)
 - Combat log with action history
+- Spawn panel with an AI dropdown, populated from `/api/ai/list`
 - Control buttons (Start, Next Turn, Auto Play)
 
 ## Getting Started
 
 ### Prerequisites
-- Java 17+
+- JDK 17+ (a full JDK, not just a JRE — the AI plugin system uses `javax.tools.JavaCompiler`, which is JDK-only)
 - Maven 3.8+
 
 ### Build & Run
 
 ```powershell
-# Navigate to parent directory
-cd monstersknow-parent
-
 # Build project (use "install", not "package" — the server module
 # depends on monstersknow-core via the local Maven repo, so "package"
 # alone leaves that dependency unresolved)
 mvn clean install -DskipTests
 
-# Run server with hot reload (from the parent, in reactor mode)
+# Run server with hot reload (reactor mode)
 mvn -pl monstersknow-server -am spring-boot:run
 ```
 
@@ -85,26 +92,67 @@ directly (not as part of the reactor), it resolves `monstersknow-core` from
 
 Server will start at `http://localhost:8080`
 
+### Running tests
+
+```powershell
+mvn test
+```
+
+Covers the in-memory AI compiler/loader (`AiCompilerTest`): compiling valid and invalid sources, and verifying that recompiling an AI produces a fresh, independent instance.
+
 ## How It Works
 
-1. **Start Combat** - Three goblins spawn on the battlefield
-2. **Automatic AI** - Each goblin decides its action based on:
-   - Current health status
-   - Distance from enemies
-   - Hidden state
-   - Available arrows
-3. **Turn Execution** - CombatEngine processes each entity's action
-4. **Real-time Updates** - Web UI updates with:
-   - Entity positions
-   - Health changes
-   - Combat log entries
-   - Hidden/visible status
+1. **Start Combat** — three goblins spawn on the battlefield, using the default AI.
+2. **Automatic AI** — each goblin decides its action based on current health, distance from enemies, hidden state, available arrows, and (if spawned with an `aiName`) its custom plugin's logic instead.
+3. **Turn Execution** — `CombatEngine` processes each entity's action.
+4. **Real-time Updates** — the web UI updates with entity positions, health changes, combat log entries, and hidden/visible status.
+
+## Writing a Custom Goblin AI
+
+Like RoboWars/RobotWars, you can write your own goblin tactics as a plain `.java` file — no changes to the game's source and no restart required. The server compiles it in memory and loads it via reflection.
+
+**1. Implement `GoblinAi`:**
+
+```java
+package com.monstersknow.ai.plugins;
+
+import com.monstersknow.core.ai.AiContext;
+import com.monstersknow.core.ai.AiEntityView;
+import com.monstersknow.core.ai.GoblinAi;
+import com.monstersknow.core.entity.Action;
+
+public class RusherAi implements GoblinAi {
+    @Override
+    public Action decideAction(AiContext ctx) {
+        AiEntityView enemy = ctx.getNearestEnemy();
+        if (enemy == null) {
+            return Action.idle();
+        }
+        double distance = ctx.getSelfPosition().distanceTo(enemy.getPosition());
+        if (distance <= ctx.getMeleeWeaponRange()) {
+            return Action.attackMelee(enemy.getId());
+        }
+        return Action.moveTowards(enemy.getPosition(), 30.0);
+    }
+}
+```
+
+Requirements: `package com.monstersknow.ai.plugins;`, a `public class` implementing `GoblinAi`, and a public no-arg constructor. `AiContext`/`AiEntityView` are deliberately read-only — a plugin can query the battlefield (nearest enemy, distance, cover, arrows, weapon ranges, ...) but can't mutate anyone's health or position directly; only `Action` factory methods (`attackRanged`, `attackMelee`, `moveTowards`, `moveAway`, `hide`, `disengage`, `dash`, `flee`, `idle`) can express intent, which `CombatEngine` then resolves. See `monstersknow-server/ai-scripts/RusherAi.java` for a working example.
+
+**2. Load it, either by:**
+- Dropping the `.java` file in `monstersknow-server/ai-scripts/` — scanned once at server startup, `aiName` = filename without `.java`.
+- `POST /api/ai/compile` with `{ "aiName": "RusherAi", "sourceCode": "..." }` — compiles and registers it live, no restart needed. Recompiling under the same `aiName` replaces the previous version; entities already spawned with the old version keep their old behavior until re-spawned.
+
+**3. Use it:** `POST /api/combat/spawn` with `{ "type": "goblin", "posX": 400, "posY": 300, "aiName": "RusherAi" }`, or pick it from the AI dropdown in the web UI.
+
+If a plugin throws or returns `null`, the goblin falls back to the default built-in ambush tactics for that turn rather than crashing combat.
+
+**Security note:** this compiles and runs arbitrary Java with full JVM privileges (there's no sandboxing — Java's `SecurityManager` is deprecated for removal and isn't a viable option). Fine for local/hobby use with trusted contributors; don't expose `/api/ai/compile` beyond localhost.
 
 ## Expanding the System
 
-To add new monster types:
+To add a wholly new monster **type** (not just new goblin tactics), create a new class extending `Entity`:
 
-1. **Create a new class extending `Entity`**:
 ```java
 public class Bugbear extends Entity {
     // Override decideAction() with custom tactics
@@ -115,11 +163,7 @@ public class Bugbear extends Entity {
 }
 ```
 
-2. **Add to CombatService**:
-```java
-Bugbear bugbear = new Bugbear("bugbear-1", "Gornak");
-activeCombatants.add(bugbear);
-```
+...and wire it into `CombatService.createGoblin`-style dispatch (currently `hobgoblin`/`bugbear` are TODO placeholders reusing `Goblin`). For goblin tactics specifically, prefer the [custom AI plugin system](#writing-a-custom-goblin-ai) above — it needs no game rebuild at all.
 
 ## Future Enhancements
 
@@ -130,13 +174,14 @@ activeCombatants.add(bugbear);
 - [ ] Save/Load combat scenarios
 - [ ] Replay system with pause/step-through
 - [ ] Web-based scenario builder
-- [ ] More monster types (Hobgoblins, Bugbears, Orcs, etc.)
+- [ ] More monster types (Hobgoblins, Bugbears, Orcs, etc.) with their own AI contracts
 - [ ] Player-controlled entity
 - [ ] Statistics and battle reports
+- [ ] Timeout/interrupt protection for runaway custom AI plugins
 
 ## Class Design Notes
 
-- **Stateless Actions** - All decisions made from observable game state only
-- **Modular Tactics** - Each creature type has isolated decision logic
-- **Server-side Simulation** - All game logic runs on server (no client-side combat)
-- **Extensible Architecture** - Easy to add new features without changing core
+- **Stateless Actions** — all decisions made from observable game state only
+- **Modular Tactics** — each creature type has isolated decision logic
+- **Server-side Simulation** — all game logic runs on server (no client-side combat)
+- **Extensible Architecture** — easy to add new features without changing core, including user-authored AI plugins compiled and loaded at runtime
